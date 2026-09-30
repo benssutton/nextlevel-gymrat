@@ -31,7 +31,7 @@ asyncpg>=0.29,<1.0
 
 # Observability
 psutil>=5.9,<8.0
-prometheus-fastapi-instrumentator>=8.0,<9.0
+prometheus-fastapi-instrumentator>=8.1.0,<9.0
 
 # Testing
 pytest>=9.0.3,<10.0
