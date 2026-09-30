@@ -81,6 +81,14 @@ android {
     testOptions {
         // Robolectric needs merged resources to render Compose UI in JVM tests.
         unitTests.isIncludeAndroidResources = true
+        // Robolectric's FileDescriptor interceptor reflects into JDK internals, which
+        // JDK 17+ only allows when the packages are exported/opened to test code.
+        unitTests.all {
+            it.jvmArgs(
+                "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--add-opens=java.base/java.io=ALL-UNNAMED"
+            )
+        }
         animationsDisabled = true
     }
 
