@@ -31,12 +31,16 @@ jobs:
       ios: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ios == 'true' }}
       contract: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.contract == 'true' }}
     steps:
+      # Credentials are kept here (unlike other jobs): on push events the
+      # filter runs `git fetch` to get the pre-push commit, which needs auth.
+      # The job's token is read-only (contents/pull-requests: read).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
+          # On push, compare against the commit before the push (base == pushed
+          # branch), not the repo default branch. Ignored for pull_request events.
+          base: ${{ github.ref_name }}
           filters: |
             backend:
               - 'backend/**'
