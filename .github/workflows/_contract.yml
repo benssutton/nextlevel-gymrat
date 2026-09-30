@@ -22,12 +22,8 @@ jobs:
       - name: Start backend (HTTP on :8000)
         working-directory: backend
         run: docker compose -f docker-compose.yml -f docker-compose.http.yml up -d --build --wait
-      - name: Swift contract tests
-        run: >
-          docker run --rm --network host
-          -e GYMRAT_API_BASE_URL=http://localhost:8000
-          -v "$PWD/ios/Packages/GymRatKit:/pkg" -w /pkg
-          swift:6.1 swift test
+      # Kotlin runs before Swift: the Swift container writes root-owned files under
+      # ios/Packages/GymRatKit/.build, which setup-gradle's wrapper scan can't read.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -38,6 +34,12 @@ jobs:
         env:
           GYMRAT_API_BASE_URL: http://localhost:8000
         run: ./gradlew :core:test
+      - name: Swift contract tests
+        run: >
+          docker run --rm --network host
+          -e GYMRAT_API_BASE_URL=http://localhost:8000
+          -v "$PWD/ios/Packages/GymRatKit:/pkg" -w /pkg
+          swift:6.1 swift test
       - name: Backend logs
         if: failure()
         working-directory: backend
