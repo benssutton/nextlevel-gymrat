@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release: HTTPS only (the platform default). The debug variant overrides this file
+     (src/debug/res/xml) to allow plain HTTP to the local backend. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

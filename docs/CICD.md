@@ -11,12 +11,18 @@ and are listed under [Plan-dependent features](#plan-dependent-features).
 | `ci.yml` | every PR, push to `main`, manual | Entry point. Detects changed paths and calls the reusable workflows below. Ends with **`CI OK`**, the only check to mark as required. |
 | `_backend.yml` | called by `ci.yml`, `nightly.yml` | Backend gates (see below). Pushes the image to GHCR on `main`. |
 | `_ios.yml` | called by `ci.yml` | iOS gates (see below). |
-| `_contract.yml` | called by `ci.yml`, `nightly.yml` | Runs the Swift API-client tests against the real backend in Docker Compose. |
+| `_android.yml` | called by `ci.yml` | Android gates (see below). |
+| `_contract.yml` | called by `ci.yml`, `nightly.yml` | Runs both API clients' tests (Swift GymRatKit, Kotlin `android/core`) against the real backend in Docker Compose. |
 | `nightly.yml` | daily 03:17 UTC, manual | Full backend run, including the k6 **stress** test and a fresh CVE audit, plus the contract tests. |
 | `ios-release.yml` | tag `ios/v*`, manual | Archive, sign (automatic, via App Store Connect API key) and upload to TestFlight. |
-| `codeql.yml` | PR, `main`, weekly | CodeQL for Python, Actions and Swift. **Opt-in** (paid on private repos). |
+| `android-release.yml` | tag `android/v*`, manual | Build a signed release bundle (AAB) and upload it to the Google Play **internal** testing track. |
+| `codeql.yml` | PR, `main`, weekly | CodeQL for Python, Actions, Kotlin and Swift. **Opt-in** (paid on private repos). |
 | `dependency-review.yml` | PR | Blocks vulnerable or disallowed-license dependencies. **Opt-in** (paid on private repos). |
-| `dependabot.yml` | weekly | Version updates for Actions, pip, Dockerfiles and Compose images. |
+| `dependabot.yml` | weekly | Version updates for Actions, pip, Gradle, Dockerfiles and Compose images. |
+
+The **Repo hygiene** job in `ci.yml` also runs `.github/scripts/check_ui_parity.py`. It fails
+when an iOS accessibility identifier has no matching Android test tag, or the reverse
+(see [FEATURE_PARITY.md](FEATURE_PARITY.md)).
 
 ### Backend gates (`_backend.yml`)
 1. **Lint & type-check**: `ruff check` and `pyright` (standard mode, `backend/pyrightconfig.json`). Both must be clean.
@@ -30,8 +36,15 @@ and are listed under [Plan-dependent features](#plan-dependent-features).
 2. **GymRatKit tests** on Linux (`swift:6.1` container), with warnings as errors.
 3. **App build & tests** on `macos-latest` with the latest stable Xcode. Generates the project with XcodeGen, runs unit and UI tests on the newest iPhone simulator, writes an `xccov` coverage summary, uploads the `.xcresult`, and runs an unsigned **Release device build** to catch Release-only breakage.
 
+### Android gates (`_android.yml`)
+All on Linux runners.
+1. **Lint**: ktlint via Spotless (`spotlessCheck`) and Android Lint (`lintDebug`). Lint errors fail the build, and the HTML report is uploaded.
+2. **Tests**: `:core` unit tests, plus `:app` JVM tests covering the ViewModel and the Compose UI rendered by **Robolectric** (no emulator). Kotlin warnings are errors.
+3. **Build**: debug APK (uploaded as an artifact) and an **R8-minified release bundle**, to catch shrinking problems before release.
+4. **Emulator**: instrumented Compose UI tests on an API 35 emulator (KVM-accelerated), launching the real app. The equivalent of the iOS XCUITest run.
+
 Everything that can run on Linux does. macOS minutes count **10×** against a
-private repo's included minutes, so only the app build/test job uses macOS.
+private repo's included minutes, so only the iOS app build/test job uses macOS.
 
 ## One-time repository setup
 
@@ -67,6 +80,32 @@ private repo's included minutes, so only the app build/test job uses macOS.
 No certificates or provisioning profiles are stored anywhere. `xcodebuild
 -allowProvisioningUpdates` with the API key creates and manages them.
 
+### Google Play releases (`android-release.yml`)
+1. In Play Console, create the app with the `applicationId` from
+   `android/app/build.gradle.kts`, and enrol in **Play App Signing**. Google holds the
+   app-signing key; CI only holds an *upload* key.
+2. Create an upload keystore once:
+   `keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`.
+   Keep it outside the repo (`*.jks` is git-ignored).
+3. The Play Developer API only accepts uploads for an app that already has a release, so
+   upload the first bundle **manually** (Play Console → Internal testing). Build it with the
+   signing env vars set, as the workflow does.
+4. Google Cloud → create a **service account** and a JSON key. Then Play Console → Users and
+   permissions → invite the service-account email with *Release to testing tracks*.
+5. Add these repository secrets:
+
+   | Secret | Value |
+   |---|---|
+   | `ANDROID_UPLOAD_KEYSTORE_BASE64` | `base64 -w0 upload.jks` output |
+   | `ANDROID_UPLOAD_KEYSTORE_PASSWORD` | keystore password |
+   | `ANDROID_UPLOAD_KEY_ALIAS` | key alias (e.g. `upload`) |
+   | `ANDROID_UPLOAD_KEY_PASSWORD` | key password |
+   | `PLAY_SERVICE_ACCOUNT_JSON` | contents of the service-account JSON key |
+
+6. Release with `git tag android/v0.1.0 && git push origin android/v0.1.0`, or run the
+   workflow manually. The `versionCode` is the workflow run number. The R8 mapping file is
+   kept as an artifact so crash stack traces can be de-obfuscated.
+
 ## Plan-dependent features
 
 | Feature | Private repo on Free | Needs |
@@ -85,5 +124,6 @@ and variables → Actions → **Variables** → add `ENABLE_CODE_SCANNING` = `tr
 
 ### Minute budget
 A typical iOS PR run uses ~10–15 macOS minutes, which bills as ~100–150 of the
-2,000 included minutes. Backend-only PRs use ~15–20 Linux minutes. Path filtering
-means a PR only pays for the side it touches.
+2,000 included minutes. Android PRs use ~25–35 Linux minutes across four parallel
+jobs, most of it the emulator job. Backend-only PRs use ~15–20 Linux minutes. Path
+filtering means a PR only pays for the platforms it touches.

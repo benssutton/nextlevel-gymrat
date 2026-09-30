@@ -1,0 +1,80 @@
+# Build, sign and upload the Android app to the Google Play internal testing track.
+# Mirrors ios-release.yml (TestFlight).
+#
+# Required repository secrets (Settings → Secrets → Actions):
+#   ANDROID_UPLOAD_KEYSTORE_BASE64     base64 of the upload keystore (.jks)
+#   ANDROID_UPLOAD_KEYSTORE_PASSWORD   keystore password
+#   ANDROID_UPLOAD_KEY_ALIAS           key alias
+#   ANDROID_UPLOAD_KEY_PASSWORD        key password
+#   PLAY_SERVICE_ACCOUNT_JSON          Play Console service-account JSON key
+# See docs/CICD.md for setup.
+name: Android Release (Play internal)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["android/v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  play-internal:
+    name: Build, sign & upload to Play (internal)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    env:
+      KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+      ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+      ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+      ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - name: Check signing and Play secrets are configured
+        working-directory: .
+        run: |
+          missing=0
+          for v in KEYSTORE_BASE64 ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD PLAY_SERVICE_ACCOUNT_JSON; do
+            if [ -z "${!v}" ]; then echo "::error::Secret for $v is not set — see docs/CICD.md"; missing=1; fi
+          done
+          exit $missing
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Write upload keystore
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          echo "ANDROID_UPLOAD_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+      - name: Build signed release bundle
+        run: ./gradlew :app:bundleRelease -Pgymrat.versionCode=${{ github.run_number }}
+      - name: Upload to Play (internal track)
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.nextlevel.gymrat
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-release-${{ github.run_number }}
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/mapping/release/mapping.txt
+          retention-days: 90
+      - name: Remove keystore
+        if: always()
+        working-directory: .
+        run: rm -f "$RUNNER_TEMP/upload.jks"
