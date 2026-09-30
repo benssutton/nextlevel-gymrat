@@ -1,10 +1,10 @@
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from core.container import Container
 from services.health import HealthService
 
 
-def register(mcp: FastMCP, container: Container) -> None:
+def register(mcp: MCPServer, container: Container) -> None:
     # MCP tools run outside FastAPI's request DI, so the owning app's
     # container is passed in explicitly and captured by the tool closures.
     @mcp.tool()

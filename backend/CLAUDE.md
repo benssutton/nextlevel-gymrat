@@ -40,7 +40,7 @@ settings.py                     Pydantic BaseSettings config; env vars override 
 ## Key Patterns
 
 **App Factory & Dependency Injection**
-- `main.create_app(settings)` builds a fully isolated app with its own `Container`, `FastMCP` instance and lifespan. The only app-scoped object at module level is `app = create_app(get_settings())`, for uvicorn.
+- `main.create_app(settings)` builds a fully isolated app with its own `Container`, `MCPServer` instance and lifespan. The only app-scoped object at module level is `app = create_app(get_settings())`, for uvicorn.
 - This isolation is load-bearing. The MCP session manager can only `run()` once per instance, so any code path that needs a second app (e.g. a test with different `Settings`) must call `create_app` again. Never re-run a lifespan against an existing app.
 - The custom `Container` in `core/container.py` holds one set of singletons per app, stored on `app.state.container`. Getters in `core/dependencies.py` resolve it from `request.app.state` and provide `Annotated` type aliases for routes.
 - MCP tools run outside FastAPI's request DI, so `mcp_routers.tools.register(mcp, container)` receives the container explicitly and captures it in tool closures.

@@ -24,7 +24,7 @@ def postgres_url(pg: PostgresContainer) -> SecretStr:
 # ── Async Test Client ──────────────────────────────────────────────────────
 #
 # Each client fixture builds its OWN isolated app via main.create_app — its
-# own DI container, FastMCP instance, and lifespan — so multiple apps with
+# own DI container, MCPServer instance, and lifespan — so multiple apps with
 # different Settings can coexist in one pytest process without sharing state.
 
 @pytest.fixture(scope="session")

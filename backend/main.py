@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from core.container import Container
 from core.correlation import CorrelationIdMiddleware
@@ -25,7 +25,7 @@ logging.getLogger("asyncio").addFilter(
     lambda r: not (r.exc_info and isinstance(r.exc_info[1], ConnectionResetError))
 )
 
-def create_lifespan(settings: Settings, mcp: FastMCP):
+def create_lifespan(settings: Settings, mcp: MCPServer):
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         container: Container = app.state.container
@@ -44,7 +44,7 @@ def create_lifespan(settings: Settings, mcp: FastMCP):
 def create_app(settings: Settings) -> FastAPI:
     """Build a fully isolated application instance.
 
-    Everything stateful — the DI container, the FastMCP server (whose
+    Everything stateful — the DI container, the MCPServer (whose
     session manager can only run once per instance), and the lifespan — is
     created fresh per call, so multiple apps can coexist in one process
     (e.g. test apps with different settings running in the same pytest
@@ -53,10 +53,10 @@ def create_app(settings: Settings) -> FastAPI:
     configure_logging()
     container = Container(settings)
 
-    mcp = FastMCP(
+    mcp = MCPServer(
         name=settings.mcp_name,
-        streamable_http_path="/",
         instructions=settings.mcp_instructions,
+        version=settings.app_version,
     )
     tools.register(mcp, container)
 
@@ -99,7 +99,8 @@ def create_app(settings: Settings) -> FastAPI:
         container.register_singleton(MetricsService, metrics_service)
         app.include_router(metrics.router)
 
-    app.mount("/mcp", mcp.streamable_http_app())
+    # The sub-app serves at its own root; the mount supplies the /mcp prefix.
+    app.mount("/mcp", mcp.streamable_http_app(streamable_http_path="/"))
 
     @app.get("/", tags=["API Root Page"])
     async def get_root():

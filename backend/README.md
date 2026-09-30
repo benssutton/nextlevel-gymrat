@@ -43,7 +43,7 @@ the whole test suite run in a single pytest session).
 | **REST-first routers** | Every capability — config, health, metrics — is a REST endpoint. Routers are thin; logic lives in services | [routers/](routers/) |
 | **Pydantic schemas** | Request/response models give automatic validation + OpenAPI docs | [schemas/](schemas/) |
 | **OpenAPI / Swagger** | Tag metadata is co-located with each router and assembled in the factory; docs served at `/docs` | [`openapi_tags`](main.py) |
-| **MCP server** | A `FastMCP` server is mounted at `/mcp` as a **starting point** for exposing capabilities to AI agents. One example tool (`get_health_status`) mirrors a REST endpoint by calling the same service; `resources.py` / `prompts.py` are stubs to fill in. MCPs are optional and add no new logic | [mcp_routers/tools.py](mcp_routers/tools.py), [`app.mount("/mcp")`](main.py) |
+| **MCP server** | An `MCPServer` (MCP Python SDK 2.x) is mounted at `/mcp` as a **starting point** for exposing capabilities to AI agents. One example tool (`get_health_status`) mirrors a REST endpoint by calling the same service; `resources.py` / `prompts.py` are stubs to fill in. MCPs are optional and add no new logic | [mcp_routers/tools.py](mcp_routers/tools.py), [`app.mount("/mcp")`](main.py) |
 
 > **Design note — REST-first, MCP as a starting point.** Application management,
 > configuration, observability and functional calls are *all* REST endpoints.
