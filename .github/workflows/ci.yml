@@ -29,6 +29,7 @@ jobs:
     outputs:
       backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
       ios: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ios == 'true' }}
+      android: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.android == 'true' }}
       contract: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.contract == 'true' }}
     steps:
       # Credentials are kept here (unlike other jobs): on push events the
@@ -50,6 +51,10 @@ jobs:
               - 'ios/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/_ios.yml'
+            android:
+              - 'android/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/_android.yml'
             contract:
               - 'backend/routers/**'
               - 'backend/schemas/**'
@@ -57,6 +62,8 @@ jobs:
               - 'backend/Dockerfile'
               - 'backend/requirements.txt'
               - 'ios/Packages/GymRatKit/**'
+              - 'android/core/**'
+              - 'android/gradle/libs.versions.toml'
               - '.github/workflows/_contract.yml'
 
   hygiene:
@@ -70,6 +77,8 @@ jobs:
           persist-credentials: false
       - name: Lint workflows (actionlint + shellcheck)
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - name: iOS ↔ Android UI parity (accessibility identifiers = test tags)
+        run: python3 .github/scripts/check_ui_parity.py
       - name: Scan for committed secrets (gitleaks)
         run: >
           docker run --rm -v "$PWD:/repo" -w /repo
@@ -93,6 +102,12 @@ jobs:
     if: needs.changes.outputs.ios == 'true'
     uses: ./.github/workflows/_ios.yml
 
+  android:
+    name: Android
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    uses: ./.github/workflows/_android.yml
+
   contract:
     name: API contract
     needs: changes
@@ -102,7 +117,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: always()
-    needs: [changes, hygiene, backend, ios, contract]
+    needs: [changes, hygiene, backend, ios, android, contract]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job failed or was cancelled

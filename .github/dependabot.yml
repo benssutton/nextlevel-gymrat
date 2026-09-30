@@ -14,6 +14,13 @@ updates:
       python-minor-patch:
         update-types: [minor, patch]
 
+  - package-ecosystem: gradle
+    directory: /android
+    schedule: { interval: weekly }
+    groups:
+      android-minor-patch:
+        update-types: [minor, patch]
+
   - package-ecosystem: docker
     directories: [/backend, /backend/tests/performance]
     schedule: { interval: weekly }

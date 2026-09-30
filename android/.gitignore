@@ -1,0 +1,16 @@
+# Gradle / build output
+.gradle/
+.kotlin/
+build/
+captures/
+
+# Local SDK path and per-developer overrides — never commit
+local.properties
+
+# Android Studio
+.idea/
+*.iml
+
+# Signing material — never commit
+*.jks
+*.keystore

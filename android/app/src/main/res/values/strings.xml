@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- User-facing copy. Keep identical to the iOS app (see docs/FEATURE_PARITY.md). -->
+<resources>
+    <string name="app_name">GymRat</string>
+    <string name="home_title">GymRat</string>
+    <string name="section_backend">Backend</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_not_ready">Not ready</string>
+    <string name="action_refresh">Refresh</string>
+</resources>
