@@ -2,5 +2,5 @@
 # pyright is pinned exactly: new releases add checks, so bump it deliberately
 # and fix any new errors in the same commit.
 ruff>=0.15,<0.16
-pyright==1.1.408
+pyright==1.1.414
 pip-audit>=2.9,<3.0
