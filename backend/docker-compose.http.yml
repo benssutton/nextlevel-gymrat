@@ -1,0 +1,16 @@
+# Overlay: serve the app over plain HTTP on :8000 instead of HTTPS on :443.
+# Used by the iOS app in the Simulator (ATS permits http://localhost via
+# NSAllowsLocalNetworking; a self-signed cert would be rejected) and by the
+# CI contract tests in .github/workflows/_contract.yml.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.http.yml up -d --wait
+services:
+  app:
+    ports: !override
+      - "8000:8000"
+    environment:
+      SERVER_PORT: "8000"
+      SSL_KEYFILE: ""      # empty → uvicorn starts without TLS
+      SSL_CERTFILE: ""
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')\""]

@@ -1,0 +1,26 @@
+# Scheduled full run: catches newly published CVEs and upstream image drift
+# (e.g. :latest ClickHouse/Redis) even when nobody pushes, and runs the k6
+# stress test that is too slow for every PR.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (full, with stress)
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/_backend.yml
+    with:
+      run-stress: true
+
+  contract:
+    name: API contract
+    uses: ./.github/workflows/_contract.yml

@@ -1,0 +1,96 @@
+# Archive, sign and upload the app to TestFlight.
+#
+# Signing uses Xcode automatic signing authenticated with an App Store Connect
+# API key — no certificates or provisioning profiles are stored in the repo or
+# in secrets. Required repository secrets (Settings → Secrets → Actions):
+#   APPLE_TEAM_ID                  10-character Apple Developer Team ID
+#   APP_STORE_CONNECT_KEY_ID       API key ID
+#   APP_STORE_CONNECT_ISSUER_ID    API key issuer ID
+#   APP_STORE_CONNECT_KEY_P8       base64 of the AuthKey_<id>.p8 file
+# See docs/CICD.md for setup.
+name: iOS Release (TestFlight)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["ios/v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Archive & upload to TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: ios
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+    steps:
+      - name: Check signing secrets are configured
+        working-directory: .
+        run: |
+          missing=0
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!v}" ]; then echo "::error::Secret for $v is not set — see docs/CICD.md"; missing=1; fi
+          done
+          exit $missing
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: brew install xcodegen
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+      - run: xcodegen generate
+      - name: Write App Store Connect API key
+        run: |
+          echo "$ASC_KEY_P8" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          plutil -replace teamID -string "$APPLE_TEAM_ID" ExportOptions.plist
+      - name: Archive
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project GymRat.xcodeproj -scheme GymRat -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/GymRat.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            | xcbeautify --renderer github-actions
+      - name: Export & upload to App Store Connect
+        run: |
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/GymRat.xcarchive" \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | xcbeautify --renderer github-actions
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dSYMs-${{ github.run_number }}
+          path: ${{ runner.temp }}/GymRat.xcarchive/dSYMs
+          retention-days: 90
+      - name: Remove API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"

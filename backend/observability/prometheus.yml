@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: gymrat-backend
+    metrics_path: /metrics
+    # The app serves HTTPS on 443 with a self-signed dev cert, so scrape over
+    # https and skip verification.
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets: ["app:443"]

@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Visual Studio Code
+.vscode/
+
+# Data (ignore root data/ but allow performance/data/ for k6 test fixtures)
+/data/
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+htmlcov/
+test_run_output.txt
+
+# Performance profiling artifacts — generated locally by run_pyspy.sh, never committed
+tests/performance/profile/artifacts/
+
+# TLS material — generated locally by certs/generate_self_signed_cert.py, never committed
+*.pem
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints
+
+# Claude specs
+docs/
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/

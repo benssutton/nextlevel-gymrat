@@ -1,0 +1,37 @@
+# Runs the GymRatKit Swift contract tests against the REAL backend: the Docker
+# Compose stack is started over plain HTTP and the Swift package's tests hit it.
+# Catches drift between backend/schemas and the iOS models on either side.
+name: API contract (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Swift client ↔ live backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start backend (HTTP on :8000)
+        working-directory: backend
+        run: docker compose -f docker-compose.yml -f docker-compose.http.yml up -d --build --wait
+      - name: Swift contract tests
+        run: >
+          docker run --rm --network host
+          -e GYMRAT_API_BASE_URL=http://localhost:8000
+          -v "$PWD/ios/Packages/GymRatKit:/pkg" -w /pkg
+          swift:6.1 swift test
+      - name: Backend logs
+        if: failure()
+        working-directory: backend
+        run: docker compose logs --no-color --tail=200
+      - name: Tear down
+        if: always()
+        working-directory: backend
+        run: docker compose -f docker-compose.yml -f docker-compose.http.yml down -v

@@ -1,0 +1,28 @@
+included:
+  - GymRat
+  - GymRatTests
+  - GymRatUITests
+  - Packages/GymRatKit/Sources
+  - Packages/GymRatKit/Tests
+excluded:
+  - Packages/GymRatKit/.build
+  - build
+
+opt_in_rules:
+  - empty_count
+  - first_where
+  - implicit_return
+  - modifier_order
+  - sorted_imports
+  - vertical_whitespace_closing_braces
+
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+
+line_length:
+  warning: 140
+  error: 200
+
+identifier_name:
+  excluded: [id, ok]

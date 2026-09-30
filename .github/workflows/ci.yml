@@ -1,0 +1,112 @@
+# Entry point for every PR and every push to main.
+#
+# Only the parts of the monorepo that changed are exercised (backend/ → Linux
+# jobs, ios/ → Linux + macOS jobs). The final `ci-ok` job always runs and is the
+# ONE check to mark as required in branch protection — it passes when every job
+# that ran passed, and tolerates jobs skipped by the path filter.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
+      ios: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ios == 'true' }}
+      contract: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.contract == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/scripts/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/_backend.yml'
+            ios:
+              - 'ios/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/_ios.yml'
+            contract:
+              - 'backend/routers/**'
+              - 'backend/schemas/**'
+              - 'backend/docker-compose*.yml'
+              - 'backend/Dockerfile'
+              - 'backend/requirements.txt'
+              - 'ios/Packages/GymRatKit/**'
+              - '.github/workflows/_contract.yml'
+
+  hygiene:
+    name: Repo hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # gitleaks scans the full history of the pushed range
+          persist-credentials: false
+      - name: Lint workflows (actionlint + shellcheck)
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - name: Scan for committed secrets (gitleaks)
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo
+          ghcr.io/gitleaks/gitleaks:v8.30.1 git --redact --verbose --exit-code 1 .
+
+  backend:
+    name: Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    permissions:
+      contents: read
+      packages: write # push the image to GHCR on main
+    uses: ./.github/workflows/_backend.yml
+    with:
+      publish-image: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+  ios:
+    name: iOS
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    uses: ./.github/workflows/_ios.yml
+
+  contract:
+    name: API contract
+    needs: changes
+    if: needs.changes.outputs.contract == 'true'
+    uses: ./.github/workflows/_contract.yml
+
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [changes, hygiene, backend, ios, contract]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then exit 1; fi
+          done

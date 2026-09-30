@@ -1,0 +1,10 @@
+# Ruff lint configuration — enforced by CI (.github/workflows/_backend.yml).
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E4", "E7", "E9", "F"]   # Ruff defaults: pyflakes + pycodestyle errors
+
+[lint.per-file-ignores]
+# Imports grouped mid-file next to the tests that need them (intentional).
+"tests/test_ingest_health.py" = ["E402"]

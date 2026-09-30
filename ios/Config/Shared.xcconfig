@@ -1,0 +1,10 @@
+// Settings shared by every build configuration.
+// Change the bundle identifier to one registered in your Apple Developer account.
+APP_BUNDLE_IDENTIFIER = com.nextlevel.gymrat
+
+// Your Apple Developer Team ID. Leave empty for Simulator-only builds; CI release
+// builds pass DEVELOPMENT_TEAM from the APPLE_TEAM_ID secret.
+DEVELOPMENT_TEAM =
+
+// Optional, untracked per-developer overrides (e.g. DEVELOPMENT_TEAM, API_BASE_URL).
+#include? "Local.xcconfig"

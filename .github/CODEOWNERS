@@ -1,0 +1,3 @@
+# Default reviewers for everything; refine per path as the team grows.
+*                @benssutton
+/.github/        @benssutton

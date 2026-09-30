@@ -1,0 +1,93 @@
+# iOS quality gates. Linux runners do everything that doesn't need Xcode
+# (lint, GymRatKit tests); the macOS runner — billed at 10x Linux minutes on
+# private repos — only builds and tests the app itself.
+name: iOS (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: SwiftLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container: ghcr.io/realm/swiftlint:0.65.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: swiftlint --strict
+        working-directory: ios
+        run: swiftlint lint --strict --reporter github-actions-logging
+
+  kit:
+    name: GymRatKit tests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: swift:6.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: swift test
+        working-directory: ios/Packages/GymRatKit
+        run: swift test -Xswiftc -warnings-as-errors --enable-code-coverage
+
+  app:
+    name: App build & tests (Simulator)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: brew install xcodegen
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Pick a simulator
+        id: sim
+        run: echo "destination=$(scripts/simulator-destination.sh)" >> "$GITHUB_OUTPUT"
+      - name: Unit + UI tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project GymRat.xcodeproj -scheme GymRat \
+            -destination "${{ steps.sim.outputs.destination }}" \
+            -resultBundlePath build/TestResults.xcresult \
+            -enableCodeCoverage YES \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -d build/TestResults.xcresult ]; then
+            { echo '## iOS coverage'; echo '```'; xcrun xccov view --report --only-targets build/TestResults.xcresult; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Release build (device, unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project GymRat.xcodeproj -scheme GymRat -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: ios-test-results
+          path: ios/build/TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 7

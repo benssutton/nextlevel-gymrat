@@ -1,0 +1,4 @@
+#include "Shared.xcconfig"
+
+// Production backend — replace with the deployed API's HTTPS URL.
+API_BASE_URL = https:/$()/api.example.com

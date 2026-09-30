@@ -1,0 +1,6 @@
+#include "Shared.xcconfig"
+
+// Local backend over plain HTTP (see backend/docker-compose.http.yml). Allowed
+// by NSAllowsLocalNetworking in Info.plist. `//` starts a comment in xcconfig
+// files, hence the `$()` spacer.
+API_BASE_URL = http:/$()/localhost:8000
