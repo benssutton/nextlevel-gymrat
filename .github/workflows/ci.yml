@@ -40,7 +40,6 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
-              - '.github/scripts/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/_backend.yml'
             ios:

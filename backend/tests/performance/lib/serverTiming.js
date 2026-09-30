@@ -3,9 +3,7 @@ import { Trend } from 'k6/metrics';
 // Boundaries expected per endpoint key. Trends must be created in the init
 // context (module scope), so the full endpoint x label set is pre-declared.
 export const ENDPOINTS = {
-  data: ['clickhouse_count', 'clickhouse_select', 'total'],
-  cache: ['lsm_query', 'total'],
-  ingest: ['ingest_decode', 'ingest_lsm_write', 'total'],
+  config: ['postgres_config_get_all', 'total'],
 };
 
 const _trends = {};
@@ -15,7 +13,7 @@ for (const [endpoint, labels] of Object.entries(ENDPOINTS)) {
   }
 }
 
-// "clickhouse_select;dur=12.30, total;dur=15.00" -> { clickhouse_select: 12.3, total: 15 }
+// "postgres_config_get_all;dur=12.30, total;dur=15.00" -> { postgres_config_get_all: 12.3, total: 15 }
 // Finds the `dur` parameter anywhere in the entry, so an optional desc=… (the
 // fuller W3C Server-Timing grammar) does not drop the sample. Matches the
 // Python _render_header output and tolerates richer headers.

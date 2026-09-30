@@ -9,7 +9,7 @@
 ### 1. Create Local Docker Services 
 
 ```bash
-# Start all services (Postgres, Clickhouse, Redis & Flight Server)
+# Start all services (Postgres & the app)
 docker compose up -d --build
 
 # Verify all containers are running

@@ -8,9 +8,9 @@ report-only). Layer 2 answers *what kind* of contention it is (on demand).
 Each HTTP response carries a `Server-Timing` header with per-boundary durations
 plus a `total`. The k6 profiles parse it into an attribution table.
 
-Boundaries: `clickhouse.count`, `clickhouse.select` (GET /data); `lsm.query`
-(GET /data/cache); `ingest.decode`, `ingest.lsm_write` (POST /data/ingest);
-`postgres.config.get_all`, `postgres.config.set` (config paths).
+Boundaries: `postgres.config.get_all` (GET /config/), `postgres.config.set`
+(POST /config/). Wrap new I/O boundaries in `core.correlation.timed()` and add
+their labels to `ENDPOINTS` in `tests/performance/lib/serverTiming.js`.
 
 ### Run it
 
@@ -24,13 +24,9 @@ docker build -t perf-scripts ./tests/performance
 ```
 
 ```bash
-# Reads (ClickHouse + LSM cache):
+# Reads (Postgres config):
 docker compose up -d --build
 docker run --rm --network gymrat-backend_default -e BASE_URL=https://app -e VUS=10 -e DURATION=60s perf-scripts run /scripts/profile_reads.js
-
-# Ingest (Arrow decode + LSM write) — idle stream so HTTP is the sole writer:
-docker compose -f docker-compose.yml -f docker-compose.profiling.yml up -d --build
-docker run --rm --network gymrat-backend_default -e BASE_URL=https://app -e VUS=4 -e DURATION=60s perf-scripts run /scripts/profile_ingest.js
 ```
 
 The attribution table prints to the console. To also persist `attribution.json`
@@ -80,8 +76,8 @@ Artifacts land in `tests/performance/profile/artifacts/`:
 
 | Layer 1 says | py-spy shows | Verdict | Investigate |
 |---|---|---|---|
-| Large share in `clickhouse.*` / `postgres.*` / `lsm.query` | threads parked in recv/await; sparse `flame_gil.svg` | **I/O-bound** on that store | pooling, query shape, indexing, network |
-| Large `app_residual` (or `ingest.decode`) | heavy Python frames in `flame_gil.svg` (pyarrow decode, polars merge, pydantic) | **CPU/GIL-bound** in-process | offload to a thread / Rust, reduce work |
+| Large share in `postgres.*` | threads parked in recv/await; sparse `flame_gil.svg` | **I/O-bound** on that store | pooling, query shape, indexing, network |
+| Large `app_residual` | heavy Python frames in `flame_gil.svg` (e.g. pydantic serialisation) | **CPU/GIL-bound** in-process | offload to a thread / Rust, reduce work |
 
 If `flame_gil.svg` is a small fraction of `flame_all.svg`, the process is
 waiting (I/O); if it is most of it, the process is computing under the GIL.
@@ -90,7 +86,5 @@ waiting (I/O); if it is most of it, the process is computing under the GIL.
 
 - Layer 1 is report-only: it never fails the build. Add per-boundary budgets
   later if you want a regression gate.
-- The ingest profile runs at modest concurrency by design; the LSM store is
-  single-writer, so high-concurrency ingest contention is a separate exercise.
 - k6 reads `Server-Timing` directly from the response, so no CORS exposure
   configuration is required.

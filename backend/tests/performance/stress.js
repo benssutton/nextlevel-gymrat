@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
-import { checkDataRows } from './lib/checks.js';
+import { checkConfigList } from './lib/checks.js';
 import { RELAXED_SLO } from './lib/thresholds.js';
 
 const TARGET_RPS = parseInt(__ENV.TARGET_RPS || '50', 10);
@@ -34,7 +34,7 @@ export function setup() {
 }
 
 export default function (data) {
-  checkDataRows(http.get(`${data.baseUrl}/data`));
+  checkConfigList(http.get(`${data.baseUrl}/config/`));
 }
 
 export function teardown(data) {

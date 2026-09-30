@@ -1,11 +1,11 @@
-"""Request/ingest correlation identity, propagated via a ContextVar.
+"""Request correlation identity, propagated via a ContextVar.
 
 A single ID is carried for the lifetime of an HTTP request (set by
-CorrelationIdMiddleware) or a single ingested batch (set by the ingest loop).
-The logging filter stamps every record with the current value so one grep of
-the ID surfaces the full causal trail. asyncio.to_thread copies the context, so
-the HTTP /data/ingest path carries the request ID into the store-write thread
-automatically; the streaming ingest thread sets its own per-batch ID.
+CorrelationIdMiddleware). The logging filter stamps every record with the
+current value so one grep of the ID surfaces the full causal trail.
+asyncio.to_thread copies the context, so work offloaded to a thread keeps the
+request's ID automatically. Background work outside a request can set its own
+ID with set_correlation_id().
 """
 import contextvars
 import logging
@@ -30,9 +30,9 @@ def set_correlation_id(value: str) -> contextvars.Token:
     """Set the correlation ID and return the reset token.
 
     Callers that need to restore the previous value should pair this with
-    `correlation_id_var.reset(token)` when done — e.g. the streaming ingest
-    loop resets after each batch so backoff/error logs are not mis-attributed
-    to the last successful batch's ID. Fire-and-forget callers that never need
+    `correlation_id_var.reset(token)` when done — e.g. a background loop that
+    resets after each unit of work so later logs are not mis-attributed to
+    the previous unit's ID. Fire-and-forget callers that never need
     to restore the prior value may discard the returned token.
     """
     return correlation_id_var.set(value)

@@ -41,10 +41,8 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Ruff
         run: ruff check --output-format=github .
-      - name: Pyright (ratchet against .pyright-baseline)
-        run: |
-          pyright --outputjson > "$RUNNER_TEMP/pyright.json" || true
-          python ../.github/scripts/pyright_ratchet.py .pyright-baseline < "$RUNNER_TEMP/pyright.json"
+      - name: Pyright
+        run: pyright
 
   audit:
     name: Dependency audit
@@ -78,7 +76,7 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r requirements.txt
       - run: python certs/generate_self_signed_cert.py
-      # Real Postgres / ClickHouse / Redis / Solace via testcontainers (Docker is
+      # Real Postgres via testcontainers (Docker is
       # preinstalled on ubuntu runners). .coveragerc enforces fail_under.
       - name: pytest
         run: pytest tests/ -v --cov --cov-report=xml --cov-report=html --junitxml=junit.xml

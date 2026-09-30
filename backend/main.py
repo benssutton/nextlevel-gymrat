@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from core.container import Container
 from core.correlation import CorrelationIdMiddleware
@@ -13,19 +13,11 @@ from core.logging_config import configure_logging
 from core.boundary_timing import ServerTimingMiddleware
 from core.request_limits import MaxBodySizeMiddleware
 from settings import get_settings, Settings
-from persistence.analytics_store.clickhouse.clickhouse_client import ClickHouseClient
-from persistence.cache_store.redis.redis_client import RedisClient
 from persistence.transaction_store.postgres.postgres_client import PostgresClient
-from persistence.stream_store.lsm_store import LSMStore
-from ingestion.flight.client import FlightBatchConsumer
-from ingestion.solace.client import SolaceBatchConsumer
-from routers import health, data, config, cache, metrics
+from routers import health, config, metrics
 from mcp_routers import tools
-from services.cache import CacheService
 from services.config import ConfigService
-from services.data import DataService
 from services.metrics import MetricsService
-from services.stream_ingest import StreamIngestService
 
 log = logging.getLogger(__name__)
 
@@ -33,13 +25,7 @@ logging.getLogger("asyncio").addFilter(
     lambda r: not (r.exc_info and isinstance(r.exc_info[1], ConnectionResetError))
 )
 
-_CONSUMERS = {
-    "flight": FlightBatchConsumer,
-    "solace": SolaceBatchConsumer,
-}
-
-
-def create_lifespan(settings: Settings, mcp: FastMCP):
+def create_lifespan(settings: Settings, mcp: MCPServer):
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         container: Container = app.state.container
@@ -50,24 +36,6 @@ def create_lifespan(settings: Settings, mcp: FastMCP):
                 await conn.execute(schema_sql)
             container.register_singleton(ConfigService, ConfigService(pg_pool))
 
-            redis_client = await stack.enter_async_context(RedisClient(settings))
-            container.register_singleton(CacheService, CacheService(redis_client))
-
-            # ClickHouseClient pings inside connect_with_backoff, so a live,
-            # smoke-tested client is guaranteed here (or startup has aborted).
-            ch_client = await stack.enter_async_context(ClickHouseClient(settings))
-            container.register_singleton(DataService, DataService(ch_client))
-
-            ConsumerClass = _CONSUMERS[settings.ingest_transport]
-            consumer = await stack.enter_async_context(ConsumerClass(settings))
-            store = LSMStore(
-                flush_rows=settings.lsm_flush_rows,
-                compaction_runs=settings.lsm_compaction_runs,
-                key_columns=settings.lsm_key_columns,
-            )
-            ingest_svc = await stack.enter_async_context(StreamIngestService(consumer, store, settings))
-            container.register_singleton(StreamIngestService, ingest_svc)
-
             await stack.enter_async_context(mcp.session_manager.run())
             yield
     return lifespan
@@ -76,19 +44,19 @@ def create_lifespan(settings: Settings, mcp: FastMCP):
 def create_app(settings: Settings) -> FastAPI:
     """Build a fully isolated application instance.
 
-    Everything stateful — the DI container, the FastMCP server (whose
+    Everything stateful — the DI container, the MCPServer (whose
     session manager can only run once per instance), and the lifespan — is
     created fresh per call, so multiple apps can coexist in one process
-    (e.g. test apps with different transports running in the same pytest
+    (e.g. test apps with different settings running in the same pytest
     session).
     """
     configure_logging()
     container = Container(settings)
 
-    mcp = FastMCP(
+    mcp = MCPServer(
         name=settings.mcp_name,
-        streamable_http_path="/",
         instructions=settings.mcp_instructions,
+        version=settings.app_version,
     )
     tools.register(mcp, container)
 
@@ -96,7 +64,7 @@ def create_app(settings: Settings) -> FastAPI:
         title=settings.app_title,
         version=settings.app_version,
         description=settings.app_description,
-        openapi_tags=[health.TAG_METADATA, data.TAG_METADATA, config.TAG_METADATA, cache.TAG_METADATA],
+        openapi_tags=[health.TAG_METADATA, config.TAG_METADATA],
         lifespan=create_lifespan(settings, mcp),
     )
     app.state.container = container
@@ -123,9 +91,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_body_bytes)
 
     app.include_router(health.router, prefix="/health")
-    app.include_router(data.router, prefix="/data")
     app.include_router(config.router, prefix="/config")
-    app.include_router(cache.router, prefix="/cache")
 
     if settings.metrics_enabled:
         metrics_service = MetricsService(settings)
@@ -133,7 +99,8 @@ def create_app(settings: Settings) -> FastAPI:
         container.register_singleton(MetricsService, metrics_service)
         app.include_router(metrics.router)
 
-    app.mount("/mcp", mcp.streamable_http_app())
+    # The sub-app serves at its own root; the mount supplies the /mcp prefix.
+    app.mount("/mcp", mcp.streamable_http_app(streamable_http_path="/"))
 
     @app.get("/", tags=["API Root Page"])
     async def get_root():

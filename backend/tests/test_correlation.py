@@ -38,11 +38,12 @@ async def test_timed_records_boundary_sample_when_active():
 
     token = boundary_samples_var.set([])
     try:
-        async with timed("clickhouse.select"):
+        async with timed("postgres.select"):
             pass
         samples = boundary_samples_var.get()
+        assert samples is not None
         assert len(samples) == 1
-        assert samples[0][0] == "clickhouse.select"
+        assert samples[0][0] == "postgres.select"
         assert samples[0][1] >= 0.0
     finally:
         boundary_samples_var.reset(token)
@@ -54,6 +55,6 @@ async def test_timed_is_silent_when_no_request_active():
     from core.correlation import timed
 
     assert boundary_samples_var.get() is None
-    async with timed("clickhouse.select"):   # must not raise
+    async with timed("postgres.select"):   # must not raise
         pass
     assert boundary_samples_var.get() is None

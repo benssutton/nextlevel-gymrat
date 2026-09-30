@@ -42,6 +42,26 @@ async def test_raises_after_max_attempts():
         )
 
 
+async def test_single_attempt_does_not_retry():
+    calls = []
+
+    async def connect():
+        calls.append(1)
+        raise ConnectionError("down")
+
+    with pytest.raises(ConnectionError):
+        await connect_with_backoff(connect, label="test", max_attempts=1, base_delay=0.001)
+    assert len(calls) == 1
+
+
+async def test_zero_attempts_is_rejected():
+    async def connect():
+        return "never called"
+
+    with pytest.raises(ValueError, match="max_attempts"):
+        await connect_with_backoff(connect, label="test", max_attempts=0)
+
+
 async def test_delays_are_positive_and_increasing():
     """Verify jitter produces positive, increasing delays.
 
