@@ -1,6 +1,6 @@
 # CI / local quality tooling (not needed at runtime).
-# pyright is pinned exactly because .pyright-baseline counts its errors —
-# bump it deliberately and re-baseline in the same commit.
+# pyright is pinned exactly: new releases add checks, so bump it deliberately
+# and fix any new errors in the same commit.
 ruff>=0.15,<0.16
 pyright==1.1.408
 pip-audit>=2.9,<3.0

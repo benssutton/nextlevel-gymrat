@@ -1,18 +1,22 @@
 import json
+from typing import Any
 
 import httpx
 
 
-def parse_mcp_response(response: httpx.Response):
+def parse_mcp_response(response: httpx.Response) -> dict[str, Any]:
+    """Return the JSON-RPC message from an MCP response: the plain JSON body,
+    or the last `data:` event when the server replies with an SSE stream."""
     ct = response.headers.get("content-type", "")
-    if "text/event-stream" in ct:
-        r = None
-        for line in response.text.splitlines():
-            if line.startswith("data:"):
-                r = json.loads(line[5:].strip())
-    else:
-        r = response.json()
-    return r
+    if "text/event-stream" not in ct:
+        return response.json()
+    events = [
+        json.loads(line[5:].strip())
+        for line in response.text.splitlines()
+        if line.startswith("data:")
+    ]
+    assert events, f"SSE response contained no data events: {response.text!r}"
+    return events[-1]
 
 
 async def test_mcp(test_client):
@@ -37,7 +41,7 @@ async def test_mcp(test_client):
     })
     assert response.status_code == 200
     r = parse_mcp_response(response)
-    assert r is not None
+    assert r["result"]["serverInfo"]["name"]
 
     mcp_session_id = response.headers.get("mcp-session-id")
     session_headers = {

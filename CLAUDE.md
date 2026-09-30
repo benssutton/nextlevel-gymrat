@@ -10,8 +10,8 @@ python-webservice-template and its patterns apply unchanged.
   A hand-written stand-in (`HealthChecking` conformer) is acceptable only where a
   live backend is not available (macOS runners have no Docker). When you use one, say why.
 - Leverage the compiler: Swift 6 language mode with strict concurrency, and Swift
-  warnings are errors. Pyright for Python, ratcheted by `backend/.pyright-baseline`.
-  Lower the baseline number whenever you fix Pyright errors.
+  warnings are errors. Pyright (standard mode) for Python must report zero errors:
+  fix the types rather than adding `# type: ignore`.
 - All backend functionality is exposed over REST. The app talks to it only through `GymRatKit.APIClient`.
 
 ## iOS conventions

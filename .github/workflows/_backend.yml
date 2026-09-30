@@ -41,10 +41,8 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Ruff
         run: ruff check --output-format=github .
-      - name: Pyright (ratchet against .pyright-baseline)
-        run: |
-          pyright --outputjson > "$RUNNER_TEMP/pyright.json" || true
-          python ../.github/scripts/pyright_ratchet.py .pyright-baseline < "$RUNNER_TEMP/pyright.json"
+      - name: Pyright
+        run: pyright
 
   audit:
     name: Dependency audit

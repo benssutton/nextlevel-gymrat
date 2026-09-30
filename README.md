@@ -63,7 +63,7 @@ repo that changed are built. Details are in [docs/CICD.md](docs/CICD.md).
 | Area | Gates |
 |---|---|
 | Repo | actionlint, gitleaks secret scan |
-| Backend | ruff, pyright ratchet, pip-audit, pytest against real containers (coverage ≥ 94%), image build + Grype CVE scan + SBOM, k6 smoke and load tests; image pushed to GHCR on `main` |
+| Backend | ruff, pyright (zero errors), pip-audit, pytest against a real Postgres (coverage ≥ 94%), image build + Grype CVE scan + SBOM, k6 smoke and load tests; image pushed to GHCR on `main` |
 | iOS | SwiftLint, GymRatKit tests on Linux, app unit + UI tests on the Simulator, unsigned Release device build |
 | Contract | GymRatKit's Swift client tests against the live backend running in Docker Compose |
 | Release | `ios-release.yml`: archive, sign and upload to TestFlight (tag `ios/v*` or manual) |
