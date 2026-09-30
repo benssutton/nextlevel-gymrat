@@ -8,7 +8,7 @@ that list as each instrumented boundary completes. On the response's
 `total` for the whole handler — into a Server-Timing header.
 
 Request-scoping (the same isolation model as the correlation ID) means work that
-runs outside a request — e.g. the streaming ingest thread — never pollutes a
+runs outside a request — e.g. a background task — never pollutes a
 request's samples, and multiple isolated apps in one test process cannot collide.
 
 Implemented as pure ASGI (mirroring core.request_limits.MaxBodySizeMiddleware) so
@@ -25,7 +25,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 log = logging.getLogger(__name__)
 
-# None when no HTTP request is in flight (e.g. the streaming ingest thread):
+# None when no HTTP request is in flight (e.g. a background task):
 # record_boundary becomes a no-op and timed() only logs, exactly as before.
 boundary_samples_var: contextvars.ContextVar[list[tuple[str, float]] | None] = (
     contextvars.ContextVar("boundary_samples", default=None)
@@ -41,7 +41,7 @@ def record_boundary(label: str, milliseconds: float) -> None:
     """Append a boundary sample to the current request's list, if one is active.
 
     No-op outside an HTTP request (the list is None), so non-request callers such
-    as the streaming ingest thread are unaffected."""
+    as background tasks are unaffected."""
     samples = boundary_samples_var.get()
     if samples is not None:
         samples.append((label, milliseconds))
@@ -49,7 +49,7 @@ def record_boundary(label: str, milliseconds: float) -> None:
 
 def _render_header(samples: list[tuple[str, float]], total_ms: float) -> str:
     """Render samples into a Server-Timing value, summing duplicate labels (e.g.
-    one ingest.lsm_write per batch) and preserving first-seen order."""
+    one postgres.config.get_all per call) and preserving first-seen order."""
     aggregated: dict[str, float] = {}
     order: list[str] = []
     for label, ms in samples:

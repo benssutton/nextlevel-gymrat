@@ -27,7 +27,7 @@ cd backend
 docker compose -f docker-compose.yml -f docker-compose.http.yml up -d --build --wait
 curl http://localhost:8000/health/ready
 
-# Tests use real Postgres/ClickHouse/Redis via testcontainers
+# Tests use a real Postgres via testcontainers
 pip install -r requirements.txt -r requirements-dev.txt
 python certs/generate_self_signed_cert.py
 pytest tests/ --cov

@@ -15,31 +15,15 @@ class ProbeResult(BaseModel):
     error: str | None = None
 
 
-class IngestHealth(BaseModel):
-    transport: str
-    connection_state: str  # "connected" | "reconnecting" | "down"
-    thread_alive: bool
-    last_batch_at: datetime | None = None
-    seconds_since_last_batch: float | None = None
-    rows_ingested_total: int = 0
-    stale: bool = False
-
-
 class CheckResult(BaseModel):
     """A single entry in the flat /health/ready checks array.
 
-    Dependency checks populate name/status/latency_ms; the ingest check
-    additionally populates transport/connection_state/etc. Serialised with
-    response_model_exclude_none so each check shows only its relevant fields.
+    Serialised with response_model_exclude_none, so `error` appears only on
+    failed checks.
     """
     name: str
     status: str
     latency_ms: float | None = None
-    transport: str | None = None
-    connection_state: str | None = None
-    thread_alive: bool | None = None
-    last_batch_at: datetime | None = None
-    seconds_since_last_batch: float | None = None
     error: str | None = None
 
 
@@ -91,6 +75,5 @@ class DetailedStatusResponse(BaseModel):
     app: AppInfo
     uptime: UptimeInfo
     dependencies: list[ProbeResult]
-    ingest: IngestHealth
     requests: RequestInfo
     system: SystemSnapshot

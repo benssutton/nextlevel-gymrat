@@ -53,6 +53,6 @@ struct HomeView: View {
 private struct PreviewHealth: HealthChecking {
     func liveness() async throws -> Liveness { Liveness(status: "alive", uptimeSeconds: 1) }
     func readiness() async throws -> Readiness {
-        Readiness(status: "ready", checks: [.init(name: "postgres", status: "up"), .init(name: "redis", status: "up")])
+        Readiness(status: "ready", checks: [.init(name: "postgres", status: "up", latencyMs: 1.2)])
     }
 }

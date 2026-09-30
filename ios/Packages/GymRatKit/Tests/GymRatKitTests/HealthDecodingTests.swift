@@ -13,16 +13,15 @@ struct HealthDecodingTests {
     @Test func decodesReadinessIgnoringUnknownFields() throws {
         let json = Data("""
         {"status":"not_ready","checks":[
-          {"name":"postgres","status":"up","latency_ms":1.2},
-          {"name":"redis","status":"down","latency_ms":2000.0,"error":"unavailable"},
-          {"name":"ingest","status":"up","transport":"flight","connection_state":"connected","thread_alive":true}
+          {"name":"postgres","status":"down","latency_ms":2000.0,"error":"unavailable"},
+          {"name":"future_dependency","status":"up","region":"eu-west-1"}
         ]}
         """.utf8)
         let ready = try APIClient.decode(Readiness.self, from: json)
         #expect(!ready.isReady)
-        #expect(ready.checks.map(\.name) == ["postgres", "redis", "ingest"])
-        #expect(ready.checks[1] == .init(name: "redis", status: "down", latencyMs: 2000.0, error: "unavailable"))
-        #expect(ready.checks[2].latencyMs == nil)
+        #expect(ready.checks.map(\.name) == ["postgres", "future_dependency"])
+        #expect(ready.checks[0] == .init(name: "postgres", status: "down", latencyMs: 2000.0, error: "unavailable"))
+        #expect(ready.checks[1].latencyMs == nil)
     }
 
     @Test func malformedPayloadThrowsDecodingError() {

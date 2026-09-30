@@ -1,5 +1,5 @@
 # Scheduled full run: catches newly published CVEs and upstream image drift
-# (e.g. :latest ClickHouse/Redis) even when nobody pushes, and runs the k6
+# (e.g. :latest Prometheus/Grafana) even when nobody pushes, and runs the k6
 # stress test that is too slow for every PR.
 name: Nightly
 

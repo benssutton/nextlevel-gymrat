@@ -17,13 +17,9 @@ export const options = {
 };
 
 export default function () {
-  const dataRes = http.get(`${BASE}/data?limit=10`);
-  check(dataRes, { 'GET /data is 200': (r) => r.status === 200 });
-  recordServerTiming(dataRes, 'data');
-
-  const cacheRes = http.get(`${BASE}/data/cache?limit=10`);
-  check(cacheRes, { 'GET /data/cache is 200': (r) => r.status === 200 });
-  recordServerTiming(cacheRes, 'cache');
+  const configRes = http.get(`${BASE}/config/`);
+  check(configRes, { 'GET /config/ is 200': (r) => r.status === 200 });
+  recordServerTiming(configRes, 'config');
 }
 
 export function handleSummary(data) {

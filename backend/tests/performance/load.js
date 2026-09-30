@@ -1,26 +1,21 @@
 import http from 'k6/http';
 import { group, sleep } from 'k6';
-import { SharedArray } from 'k6/data';
-import { checkStatus200, checkDataRows } from './lib/checks.js';
+import { checkStatus200, checkConfigList } from './lib/checks.js';
 import { NORMAL_SLO, STRICT_SLO } from './lib/thresholds.js';
 
 const BASE_URL = __ENV.BASE_URL || 'https://localhost';
 
-const rowParams = new SharedArray('rowParams', function () {
-  return JSON.parse(open('./data/rows_params.json'));
-});
-
 export const options = {
   scenarios: {
-    browse_data: {
+    browse_config: {
       executor: 'ramping-vus',
-      exec: 'browseData',
+      exec: 'browseConfig',
       stages: [
         { duration: '30s', target: 10 },
         { duration: '60s', target: 10 },
         { duration: '30s', target: 0 },
       ],
-      tags: { scenario: 'browse_data' },
+      tags: { scenario: 'browse_config' },
     },
     health_poll: {
       executor: 'constant-vus',
@@ -31,17 +26,16 @@ export const options = {
     },
   },
   thresholds: {
-    'http_req_duration{scenario:browse_data}': NORMAL_SLO.http_req_duration,
-    'http_req_failed{scenario:browse_data}':   NORMAL_SLO.http_req_failed,
+    'http_req_duration{scenario:browse_config}': NORMAL_SLO.http_req_duration,
+    'http_req_failed{scenario:browse_config}':   NORMAL_SLO.http_req_failed,
     'http_req_duration{scenario:health_poll}': STRICT_SLO.http_req_duration,
     'http_req_failed{scenario:health_poll}':   STRICT_SLO.http_req_failed,
   },
 };
 
-export function browseData() {
-  const p = rowParams[Math.floor(Math.random() * rowParams.length)];
-  group('data', () => {
-    checkDataRows(http.get(`${BASE_URL}/data?limit=${p.limit}`));
+export function browseConfig() {
+  group('config', () => {
+    checkConfigList(http.get(`${BASE_URL}/config/`));
   });
   sleep(1);
 }

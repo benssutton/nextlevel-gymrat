@@ -22,15 +22,6 @@ class MetricsService:
             "dependency_check_latency_seconds", "Dependency health-check latency",
             ["name"], registry=self.registry)
 
-        self.ingest_state = Gauge(
-            "ingest_connection_state", "Ingest transport connection state (1=active)",
-            ["transport", "state"], registry=self.registry)
-        self.ingest_secs = Gauge(
-            "ingest_seconds_since_last_batch", "Seconds since last ingested batch",
-            registry=self.registry)
-        self.ingest_rows = Gauge(
-            "ingest_rows_ingested", "Total rows ingested", registry=self.registry)
-
         self.proc_cpu = Gauge("process_cpu_percent", "Process CPU percent", registry=self.registry)
         self.proc_mem = Gauge(
             "process_memory_rss_bytes", "Process resident memory bytes", registry=self.registry)
@@ -60,14 +51,6 @@ class MetricsService:
         for dep in status.dependencies:
             self.dep_up.labels(name=dep.name).set(1.0 if dep.status == "up" else 0.0)
             self.dep_latency.labels(name=dep.name).set(dep.latency_ms / 1000.0)
-
-        ingest = status.ingest
-        for state in ("connected", "reconnecting", "down"):
-            self.ingest_state.labels(transport=ingest.transport, state=state).set(
-                1.0 if ingest.connection_state == state else 0.0)
-        secs = ingest.seconds_since_last_batch
-        self.ingest_secs.set(secs if secs is not None else float("nan"))
-        self.ingest_rows.set(ingest.rows_ingested_total)
 
         proc = status.system.process
         host = status.system.host

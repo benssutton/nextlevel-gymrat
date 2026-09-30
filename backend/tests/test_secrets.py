@@ -9,7 +9,7 @@ def test_credential_fields_are_secretstr():
     # plain str. No HTTP endpoint exposes the DSN, so this type assertion — not
     # an endpoint check — is what actually catches a regression here.
     s = Settings()
-    for field in (s.postgres_url, s.clickhouse_password, s.redis_url, s.solace_password):
+    for field in (s.postgres_url,):
         assert isinstance(field, SecretStr)
         # SecretStr.repr() must be masked for non-empty values — guards against
         # pydantic regressions where SecretStr is accepted but renders as

@@ -21,14 +21,9 @@
       "targets": [{"expr": "dependency_up", "legendFormat": "{{name}}"}]
     },
     {
-      "id": 4, "type": "stat", "title": "Ingest connection state",
-      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
-      "targets": [{"expr": "ingest_connection_state", "legendFormat": "{{state}}"}]
-    },
-    {
-      "id": 5, "type": "timeseries", "title": "Seconds since last ingest",
-      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
-      "targets": [{"expr": "ingest_seconds_since_last_batch", "legendFormat": "staleness"}]
+      "id": 4, "type": "timeseries", "title": "Dependency check latency (s)",
+      "gridPos": {"h": 8, "w": 16, "x": 8, "y": 8},
+      "targets": [{"expr": "dependency_check_latency_seconds", "legendFormat": "{{name}}"}]
     },
     {
       "id": 6, "type": "timeseries", "title": "Process CPU % / memory bytes",

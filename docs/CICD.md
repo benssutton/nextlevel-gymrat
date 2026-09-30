@@ -21,7 +21,7 @@ and are listed under [Plan-dependent features](#plan-dependent-features).
 ### Backend gates (`_backend.yml`)
 1. **Lint & type-check**: `ruff check` and a Pyright *ratchet*. The copied template has pre-existing Pyright errors, and `backend/.pyright-baseline` holds their count. The job fails only if that count goes **up**. Lower the baseline as you fix errors.
 2. **Dependency audit**: `pip-audit` against `requirements.txt`.
-3. **Tests & coverage**: the full pytest suite against real Postgres, ClickHouse, Redis and Solace containers (testcontainers). `.coveragerc` enforces ≥ 94% coverage. JUnit, coverage XML and HTML reports are uploaded as artifacts, and a coverage table is written to the job summary.
+3. **Tests & coverage**: the full pytest suite against a real Postgres container (testcontainers). `.coveragerc` enforces ≥ 94% coverage. JUnit, coverage XML and HTML reports are uploaded as artifacts, and a coverage table is written to the job summary.
 4. **Container image**: Buildx build with GitHub Actions layer caching, then a **Grype** scan that fails on critical CVEs with a fix available, then an **SPDX SBOM** artifact. On `main` the image is pushed to `ghcr.io/<owner>/nextlevel-gymrat/backend:{latest,sha-…}`.
 5. **Performance**: runs after tests and image build. Starts the full Compose stack and runs the k6 smoke and load tests as hard gates. The stress test runs nightly as a soft gate.
 

@@ -11,17 +11,13 @@ from schemas.health import (
     CheckResult,
     DetailedStatusResponse,
     HealthStatusResponse,
-    IngestHealth,
     LivenessResponse,
     ProbeResult,
     ReadinessResponse,
     RequestInfo,
     UptimeInfo,
 )
-from services.cache import CacheService
 from services.config import ConfigService
-from services.data import DataService
-from services.stream_ingest import StreamIngestService
 from settings import Settings
 
 if TYPE_CHECKING:
@@ -70,50 +66,21 @@ class HealthService:
 
     async def _gather_dependencies(self) -> list[ProbeResult]:
         return list(await asyncio.gather(
+            # Add a probe here for each new critical dependency.
             self._probe(ConfigService, "postgres"),
-            self._probe(DataService, "clickhouse"),
-            self._probe(CacheService, "redis"),
         ))
-
-    async def _ingest_health(self) -> IngestHealth:
-        try:
-            service = self._container.get(StreamIngestService)
-        except ValueError:
-            return IngestHealth(
-                transport=self.settings.ingest_transport,
-                connection_state="down", thread_alive=False,
-            )
-        return await service.health_check()
-
-    def _ingest_status(self, ingest: IngestHealth) -> str:
-        if ingest.connection_state != "connected":
-            return "down"
-        if ingest.stale and self.settings.ingest_stale_fails_readiness:
-            return "down"
-        return "up"
 
     async def readiness(self) -> ReadinessResponse:
         deps = await self._gather_dependencies()
-        ingest = await self._ingest_health()
-        ingest_status = self._ingest_status(ingest)
-
         checks = [
             CheckResult(name=d.name, status=d.status, latency_ms=d.latency_ms, error=d.error)
             for d in deps
         ]
-        checks.append(CheckResult(
-            name="ingest", status=ingest_status, transport=ingest.transport,
-            connection_state=ingest.connection_state, thread_alive=ingest.thread_alive,
-            last_batch_at=ingest.last_batch_at,
-            seconds_since_last_batch=ingest.seconds_since_last_batch,
-        ))
-
-        all_up = all(d.status == "up" for d in deps) and ingest_status == "up"
+        all_up = all(d.status == "up" for d in deps)
         return ReadinessResponse(status="ready" if all_up else "not_ready", checks=checks)
 
     async def detailed_status(self) -> DetailedStatusResponse:
         deps = await self._gather_dependencies()
-        ingest = await self._ingest_health()
         snapshot = collect_system_snapshot(self._process)
         return DetailedStatusResponse(
             app=AppInfo(
@@ -126,7 +93,6 @@ class HealthService:
                 system_boot_seconds=psutil.boot_time(),
             ),
             dependencies=deps,
-            ingest=ingest,
             requests=RequestInfo(last_request_at=self._container.last_request_at),
             system=snapshot,
         )
