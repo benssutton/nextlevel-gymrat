@@ -1,6 +1,6 @@
 # CI / local quality tooling (not needed at runtime).
 # pyright is pinned exactly: new releases add checks, so bump it deliberately
 # and fix any new errors in the same commit.
-ruff>=0.15,<0.16
+ruff>=0.16.9,<0.17
 pyright==1.1.414
 pip-audit>=2.10.1,<3.0
