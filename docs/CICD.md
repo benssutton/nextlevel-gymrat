@@ -13,38 +13,41 @@ and are listed under [Plan-dependent features](#plan-dependent-features).
 | `_ios.yml` | called by `ci.yml` | iOS gates (see below). |
 | `_android.yml` | called by `ci.yml` | Android gates (see below). |
 | `_contract.yml` | called by `ci.yml`, `nightly.yml` | Runs both API clients' tests (Swift GymRatKit, Kotlin `android/core`) against the real backend in Docker Compose. |
-| `nightly.yml` | daily 03:17 UTC, manual | Full backend run, including the k6 **stress** test and a fresh CVE audit, plus the contract tests. |
+| `nightly.yml` | manual (daily schedule disabled while the project is on hold) | Full backend run, including the k6 **stress** test and a fresh CVE audit, plus the contract tests. |
 | `ios-release.yml` | tag `ios/v*`, manual | Archive, sign (automatic, via App Store Connect API key) and upload to TestFlight. |
 | `android-release.yml` | tag `android/v*`, manual | Build a signed release bundle (AAB) and upload it to the Google Play **internal** testing track. |
-| `codeql.yml` | PR, `main`, weekly | CodeQL for Python, Actions, Kotlin and Swift. **Opt-in** (paid on private repos). |
+| `codeql.yml` | PR, `main` (weekly schedule disabled) | CodeQL for Python, Actions, Kotlin and Swift. **Opt-in** (paid on private repos). |
 | `dependency-review.yml` | PR | Blocks vulnerable or disallowed-license dependencies. **Opt-in** (paid on private repos). |
-| `dependabot.yml` | weekly | Version updates for Actions, pip, Gradle, Dockerfiles and Compose images. |
+| `dependabot.yml` | weekly (version-update PRs disabled while on hold) | Config for Actions, pip, Gradle, Dockerfiles and Compose images. Security updates still open PRs. |
 
 The **Repo hygiene** job in `ci.yml` also runs `.github/scripts/check_ui_parity.py`. It fails
 when an iOS accessibility identifier has no matching Android test tag, or the reverse
 (see [FEATURE_PARITY.md](FEATURE_PARITY.md)).
 
 ### Backend gates (`_backend.yml`)
-1. **Lint & type-check**: `ruff check` and `pyright` (standard mode, `backend/pyrightconfig.json`). Both must be clean.
-2. **Dependency audit**: `pip-audit` against `requirements.txt`.
-3. **Tests & coverage**: the full pytest suite against a real Postgres container (testcontainers). `.coveragerc` enforces ≥ 94% coverage. JUnit, coverage XML and HTML reports are uploaded as artifacts, and a coverage table is written to the job summary.
-4. **Container image**: Buildx build with GitHub Actions layer caching, then a **Grype** scan that fails on critical CVEs with a fix available, then an **SPDX SBOM** artifact. On `main` the image is pushed to `ghcr.io/<owner>/nextlevel-gymrat/backend:{latest,sha-…}`.
-5. **Performance**: runs after tests and image build. Starts the full Compose stack and runs the k6 smoke and load tests as hard gates. The stress test runs nightly as a soft gate.
+1. **Lint, type-check & dependency audit**: `ruff check`, `pyright` (standard mode, `backend/pyrightconfig.json`) and `pip-audit` against `requirements.txt`, in one job to share the checkout and pip install.
+2. **Tests & coverage**: the full pytest suite against a real Postgres container (testcontainers). `.coveragerc` enforces ≥ 94% coverage. JUnit, coverage XML and HTML reports are uploaded as artifacts, and a coverage table is written to the job summary.
+3. **Container image**: Buildx build with GitHub Actions layer caching, then a **Grype** scan that fails on critical CVEs with a fix available, then an **SPDX SBOM** artifact. On `main` the image is pushed to `ghcr.io/<owner>/nextlevel-gymrat/backend:{latest,sha-…}`.
+4. **Performance**: runs after tests and image build, on `main`, nightly and manual runs only (not on PRs). Starts the full Compose stack and runs the k6 smoke and load tests as hard gates. The stress test runs nightly as a soft gate.
 
 ### iOS gates (`_ios.yml`)
 1. **SwiftLint** `--strict` (Linux container).
 2. **GymRatKit tests** on Linux (`swift:6.1` container), with warnings as errors.
-3. **App build & tests** on `macos-latest` with the latest stable Xcode. Generates the project with XcodeGen, runs unit and UI tests on the newest iPhone simulator, writes an `xccov` coverage summary, uploads the `.xcresult`, and runs an unsigned **Release device build** to catch Release-only breakage.
+3. **App build & tests** on `macos-latest`, only after the two Linux jobs pass. with the latest stable Xcode. Generates the project with XcodeGen, runs unit and UI tests on the newest iPhone simulator, writes an `xccov` coverage summary, uploads the `.xcresult`, and runs an unsigned **Release device build** to catch Release-only breakage.
 
 ### Android gates (`_android.yml`)
 All on Linux runners.
-1. **Lint**: ktlint via Spotless (`spotlessCheck`) and Android Lint (`lintDebug`). Lint errors fail the build, and the HTML report is uploaded.
-2. **Tests**: `:core` unit tests, plus `:app` JVM tests covering the ViewModel and the Compose UI rendered by **Robolectric** (no emulator). Kotlin warnings are errors.
-3. **Build**: debug APK (uploaded as an artifact) and an **R8-minified release bundle**, to catch shrinking problems before release.
-4. **Emulator**: instrumented Compose UI tests on an API 35 emulator (KVM-accelerated), launching the real app. The equivalent of the iOS XCUITest run.
+1. **Lint, tests & build** (one Gradle invocation): ktlint via Spotless and Android Lint (errors fail the build); `:app` JVM tests covering the ViewModel and the Compose UI rendered by **Robolectric** (no emulator); a debug APK (uploaded) and an **R8-minified release bundle**. `:core` unit tests run in `_contract.yml` against the live backend instead of being repeated here. Kotlin warnings are errors.
+2. **Emulator**: runs only after step 1 passes: instrumented Compose UI tests on an API 35 emulator (KVM-accelerated), launching the real app. The equivalent of the iOS XCUITest run.
 
 Everything that can run on Linux does. macOS minutes count **10×** against a
 private repo's included minutes, so only the iOS app build/test job uses macOS.
+
+### Minute-saving rules
+- Pushes to `main` re-run only the backend (to publish the image); iOS, Android and contract already passed on the PR.
+- Superseded PR runs are cancelled (`concurrency`).
+- Expensive jobs (macOS app, Android emulator) `needs` the cheap gates, so a lint failure doesn't burn them.
+- Path filters skip whole platforms that a change doesn't touch.
 
 ## One-time repository setup
 

@@ -10,12 +10,14 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "29 4 * * 1" # Mondays 04:29 UTC
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze-linux:
@@ -74,8 +76,8 @@ jobs:
         with:
           category: /language:java-kotlin
 
-  # Swift needs a real build on macOS (10x minutes), so it runs on main and
-  # weekly only — not on every PR.
+  # Swift needs a real build on macOS (10x minutes), so it runs on main
+  # only — not on every PR.
   analyze-swift:
     name: Analyze (swift)
     if: vars.ENABLE_CODE_SCANNING == 'true' && github.event_name != 'pull_request'

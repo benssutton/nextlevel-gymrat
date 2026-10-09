@@ -38,6 +38,7 @@ jobs:
 
   app:
     name: App build & tests (Simulator)
+    needs: [lint, kit] # don't spend 10x macOS minutes on a change that fails Linux gates
     runs-on: macos-latest
     timeout-minutes: 40
     defaults:
