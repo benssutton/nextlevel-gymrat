@@ -26,7 +26,7 @@ env:
 
 jobs:
   lint:
-    name: Lint & type-check
+    name: Lint, type-check & dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -43,21 +43,6 @@ jobs:
         run: ruff check --output-format=github .
       - name: Pyright
         run: pyright
-
-  audit:
-    name: Dependency audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: backend/requirements*.txt
-      - run: pip install -r requirements-dev.txt
       - name: pip-audit (known CVEs in requirements.txt)
         run: pip-audit -r requirements.txt --desc
 
@@ -157,8 +142,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=backend
 
+  # Heavy (builds and runs the full compose stack), so skipped on pull requests;
+  # it runs on main, nightly and manual runs.
   performance:
     name: Performance (k6)
+    if: github.event_name != 'pull_request'
     needs: [test, image]
     runs-on: ubuntu-latest
     timeout-minutes: 30

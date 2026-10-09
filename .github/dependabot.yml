@@ -1,15 +1,19 @@
-# Dependabot version + security updates (free on private repositories).
+# Routine version-update PRs are disabled while the project is on hold (each one
+# triggers a full CI run). Security updates are separate and still open PRs.
+# To resume, remove the `open-pull-requests-limit: 0` lines.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
     groups:
       actions: { patterns: ["*"] }
 
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
     groups:
       python-minor-patch:
         update-types: [minor, patch]
@@ -17,6 +21,7 @@ updates:
   - package-ecosystem: gradle
     directory: /android
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
     groups:
       android-minor-patch:
         update-types: [minor, patch]
@@ -24,7 +29,9 @@ updates:
   - package-ecosystem: docker
     directories: [/backend, /backend/tests/performance]
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
 
   - package-ecosystem: docker-compose
     directory: /backend
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0

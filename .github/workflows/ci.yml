@@ -4,6 +4,11 @@
 # jobs, ios/ → Linux + macOS jobs). The final `ci-ok` job always runs and is the
 # ONE check to mark as required in branch protection — it passes when every job
 # that ran passed, and tolerates jobs skipped by the path filter.
+#
+# Minute-saving rules: pushes to main only re-run the backend (to publish the
+# image) because the PR already proved iOS/Android/contract on the same tree;
+# macOS and emulator jobs wait for the cheap Linux gates; superseded PR runs
+# are cancelled.
 name: CI
 
 on:
@@ -99,19 +104,19 @@ jobs:
   ios:
     name: iOS
     needs: changes
-    if: needs.changes.outputs.ios == 'true'
+    if: needs.changes.outputs.ios == 'true' && github.event_name != 'push'
     uses: ./.github/workflows/_ios.yml
 
   android:
     name: Android
     needs: changes
-    if: needs.changes.outputs.android == 'true'
+    if: needs.changes.outputs.android == 'true' && github.event_name != 'push'
     uses: ./.github/workflows/_android.yml
 
   contract:
     name: API contract
     needs: changes
-    if: needs.changes.outputs.contract == 'true'
+    if: needs.changes.outputs.contract == 'true' && github.event_name != 'push'
     uses: ./.github/workflows/_contract.yml
 
   ci-ok:

@@ -12,10 +12,13 @@ defaults:
     working-directory: android
 
 jobs:
-  lint:
-    name: Lint (ktlint + Android Lint)
+  # One job = one checkout, JDK, Gradle configuration and compile of :core/:app,
+  # instead of three. Unit tests of :core run in _contract.yml against the live
+  # backend (the contract tests self-skip here), so :core:test is not repeated.
+  check:
+    name: Lint, tests & build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,59 +29,19 @@ jobs:
           java-version: "21"
       # Also validates the Gradle wrapper checksum.
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-      - name: ktlint (Spotless) + Android Lint
-        run: ./gradlew spotlessCheck :app:lintDebug
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: android-lint-report
-          path: android/app/build/reports/lint-results-*.html
-          if-no-files-found: ignore
-          retention-days: 14
-
-  test:
-    name: Unit + Robolectric UI tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-      # :core contract tests self-skip here (no backend); _contract.yml runs them live.
-      - name: Tests
-        run: ./gradlew :core:test :app:testDebugUnitTest
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: android-test-reports
-          path: |
-            android/core/build/reports/tests/
-            android/app/build/reports/tests/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  build:
-    name: Build (debug APK + release bundle)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       # The release bundle is minified with R8 (catches shrinking problems early) but
       # unsigned; android-release.yml signs and uploads.
-      - name: Assemble
-        run: ./gradlew :app:assembleDebug :app:bundleRelease
+      - name: ktlint, Android Lint, unit + Robolectric tests, build
+        run: ./gradlew spotlessCheck :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: android-reports
+          path: |
+            android/app/build/reports/lint-results-*.html
+            android/app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-debug-apk
@@ -87,6 +50,7 @@ jobs:
 
   emulator:
     name: Instrumented UI tests (emulator)
+    needs: check # the emulator is the slowest job; skip it if lint/unit tests fail
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
