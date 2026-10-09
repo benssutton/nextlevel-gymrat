@@ -33,7 +33,7 @@ when an iOS accessibility identifier has no matching Android test tag, or the re
 ### iOS gates (`_ios.yml`)
 1. **SwiftLint** `--strict` (Linux container).
 2. **GymRatKit tests** on Linux (`swift:6.1` container), with warnings as errors.
-3. **App build & tests** on `macos-latest`, only after the two Linux jobs pass. with the latest stable Xcode. Generates the project with XcodeGen, runs unit and UI tests on the newest iPhone simulator, writes an `xccov` coverage summary, uploads the `.xcresult`, and runs an unsigned **Release device build** to catch Release-only breakage.
+3. **App build & tests** on `macos-latest`, with the latest stable Xcode, only after the two Linux jobs pass. Generates the project with XcodeGen, runs unit and UI tests on the newest iPhone simulator, writes an `xccov` coverage summary, uploads the `.xcresult`, and runs an unsigned **Release device build** to catch Release-only breakage.
 
 ### Android gates (`_android.yml`)
 All on Linux runners.
